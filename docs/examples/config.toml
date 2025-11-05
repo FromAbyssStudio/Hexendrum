@@ -1,0 +1,66 @@
+# Hexendrum Configuration File
+# Copy this file to ~/.config/hexendrum/config.toml and modify as needed
+
+[audio]
+# Default volume (0.0 to 1.0)
+default_volume = 0.7
+
+# Audio output device (leave empty for default)
+output_device = ""
+
+# Sample rate in Hz (common values: 44100, 48000, 96000)
+sample_rate = 44100
+
+# Buffer size for audio processing
+buffer_size = 4096
+
+[library]
+# Music directories to scan (add your music folders here)
+music_directories = [
+    "~/Music",
+    "~/Downloads/Music",
+    "/media/music"
+]
+
+# Supported audio file extensions
+supported_extensions = [
+    "mp3",
+    "flac",
+    "ogg",
+    "wav",
+    "m4a",
+    "aac"
+]
+
+# Automatically scan library on startup
+auto_scan = true
+
+# Scan interval in seconds (0 = disabled)
+# Recommended: 300 (5 minutes) for active libraries
+scan_interval = 300
+
+[gui]
+# Theme: "light", "dark", or "auto"
+theme = "auto"
+
+# Default window size (width, height)
+window_size = [1200, 800]
+
+# Default window position (x, y) - leave empty for auto-centering
+# window_position = [100, 100]
+
+# Show file extensions in the interface
+show_file_extensions = false
+
+[playlist]
+# Default playlist directory
+playlist_directory = "~/.config/hexendrum/playlists"
+
+# Automatically save playlists when modified
+auto_save = true
+
+# Maximum number of recent playlists to remember
+max_history = 100
+
+# Playlist file format: "json" or "m3u"
+format = "json"

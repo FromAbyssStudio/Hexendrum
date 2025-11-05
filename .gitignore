@@ -1,34 +1,95 @@
-# Rust .gitignore template
-# See https://github.com/github/gitignore/blob/main/Rust.gitignore
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Binaries for programs and plugins
+# Build outputs
+dist/
+build/
+target/
+
+# Electron
+out/
+*.dmg
 *.exe
-*.exe~
-*.dll
-*.so
-*.dylib
+*.AppImage
+*.deb
+*.rpm
 
-# Executables and build output
-/target/
-**/*.rlib
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-# Cargo package files
-Cargo.lock
+# Configuration files with sensitive information
+config.json
 
-# Code coverage and test output
-*.profraw
-*.profdata
-*.gcda
-*.gcno
-*.gcov
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
 coverage/
-*.lcov
 
-# Environment files
+# nyc test coverage
+.nyc_output
+
+# Dependency directories
+jspm_packages/
+
+# Optional npm cache directory
+.npm
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file
 .env
 
-# IDEs and editors
-.idea/
-.vscode/
-*.sw?
-# End of Selection
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# next.js build output
+.next
+
+# nuxt.js build output
+.nuxt
+
+# vuepress build output
+.vuepress/dist
+
+# Serverless directories
+.serverless
+
+# FuseBox cache
+.fusebox/
+
+# DynamoDB Local files
+.dynamodb/

@@ -1,0 +1,77 @@
+[package]
+name = "hexendrum"
+version = "0.1.0"
+edition = "2021"
+authors = ["From Abyss Studio"]
+description = "A modern, open-source music player backend written in Rust"
+license = "MIT"
+repository = "https://github.com/fromabyssstudio/Hexendrum"
+keywords = ["music", "player", "audio", "playlist", "library"]
+categories = ["multimedia", "audio"]
+
+[dependencies]
+# Core audio playback
+rodio = "0.17"
+symphonia = { version = "0.5", features = ["mp3", "flac", "ogg", "wav", "aac"] }
+
+# Audio file formats
+ogg = "0.8"
+lofty = "0.22"
+
+# File system and paths
+walkdir = "2.4"
+pathdiff = "0.2"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_urlencoded = "0.7"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Async runtime
+tokio = { version = "1.0", features = ["rt-multi-thread", "macros", "time", "fs", "process", "sync"] }
+
+# HTTP server
+axum = { version = "0.7", features = ["ws"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors"] }
+
+# OpenAPI/Swagger documentation
+utoipa = { version = "4.2", features = ["axum_extras", "chrono"] }
+utoipa-swagger-ui = { version = "6.0", features = ["axum"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+# Configuration
+config = "0.14"
+toml = "0.8"
+
+# Utilities
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.0", features = ["v4", "serde"] }
+dirs = "5.0"
+sha2 = "0.10"
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3.10"
+serial_test = "2.0"
+
+[[bin]]
+name = "hexendrum"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[profile.dev]
+opt-level = 0
+debug = true

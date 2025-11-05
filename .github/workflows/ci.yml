@@ -1,0 +1,150 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test and Build
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        rust: [stable, 1.70.0]
+        include:
+          - os: ubuntu-latest
+            rust: stable
+          - os: windows-latest
+            rust: stable
+          - os: macos-latest
+            rust: stable
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: ${{ matrix.rust }}
+        override: true
+        components: rustfmt, clippy
+
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+
+    - name: Install system dependencies (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libasound2-dev pkg-config
+
+    - name: Install system dependencies (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        brew install pkg-config
+
+    - name: Check code formatting
+      run: cargo fmt --all -- --check
+
+    - name: Run clippy
+      run: cargo clippy -- -D warnings
+
+    - name: Run tests
+      run: cargo test --verbose
+
+    - name: Build debug version
+      run: cargo build --verbose
+
+    - name: Build release version
+      run: cargo build --release --verbose
+
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+
+    - name: Install cargo-audit
+      run: cargo install cargo-audit
+
+    - name: Run security audit
+      run: cargo audit
+
+  documentation:
+    name: Build Documentation
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+
+    - name: Build documentation
+      run: cargo doc --no-deps
+
+    - name: Upload documentation artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: documentation
+        path: target/doc/
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+
+    - name: Build release binaries
+      run: |
+        cargo build --release
+        mkdir -p dist
+        cp target/release/hexendrum dist/hexendrum-linux-x86_64
+
+    - name: Create release archive
+      run: |
+        cd dist
+        tar -czf hexendrum-linux-x86_64.tar.gz hexendrum-linux-x86_64
+
+    - name: Upload release artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: release-binaries
+        path: dist/
