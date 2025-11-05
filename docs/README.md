@@ -1,3 +1,50 @@
+# Hexendrum Documentation 📚
+
+Welcome to the Hexendrum documentation hub. This directory contains all documentation organized by category.
+
+## Documentation Index
+
+### For Users 👤
+
+- **[User Guide](user/README.md)** - How to use Hexendrum
+- **[Library Configuration](user/LIBRARY_CONFIG.md)** - Setting up and managing your music library directories
+- **[Troubleshooting](TROUBLESHOOTING.md)** - Common issues and solutions
+
+### For Developers 👨‍💻
+
+- **[Developer Guide](developer/README.md)** - Contributing and development setup
+- **[Project Structure](developer/PROJECT_STRUCTURE.md)** - Code organization and architecture
+- **[Project Status](developer/PROJECT_STATUS.md)** - Current development status
+- **[Changelog](developer/CHANGELOG.md)** - Version history
+- **[Contributing Guide](developer/CONTRIBUTING.md)** - How to contribute to Hexendrum
+- **[Backend Connection Guide](developer/BACKEND_CONNECTION.md)** - How the frontend connects to the Rust backend
+- **[Electron Interface](developer/ELECTRON_README.md)** - Electron-based UI setup and usage
+- **[Prototype Notes](developer/PROTOTYPE_NOTES.md)** - Current prototype status and mock data usage
+- **[Organization Summary](developer/ORGANIZATION_SUMMARY.md)** - Complete project organization overview
+- **[UX Improvements](developer/UX_IMPROVEMENTS.md)** - User experience enhancements
+
+### API Documentation 🔌
+
+- **[API Reference](api/README.md)** - Code documentation
+- **[Swagger/OpenAPI Docs](api/SWAGGER.md)** - Interactive API documentation
+
+### Brand & Design 🎨
+
+- **[Brand Guidelines](brand/GUIDELINES.md)** - Design and branding guidelines
+
+### Examples 💡
+
+- **[Configuration Example](examples/config.toml)** - Sample configuration file
+
+---
+
+## Quick Links
+
+- **Main README**: [../README.md](../README.md)
+- **License**: [../LICENSE](../LICENSE)
+
+---
+
 # Hexendrum 🦀
 
 A modern, open-source music player written in Rust with a beautiful GUI interface.

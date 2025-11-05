@@ -55,6 +55,7 @@
   "build": {
     "appId": "com.fromabyssstudio.hexendrum",
     "productName": "Hexendrum",
+    "icon": "assets/icons/logo.png",
     "directories": {
       "output": "dist"
     },
@@ -65,14 +66,17 @@
       "assets/**/*"
     ],
     "mac": {
-      "category": "public.app-category.music"
+      "category": "public.app-category.music",
+      "icon": "assets/icons/logo.png"
     },
     "linux": {
       "target": "AppImage",
-      "category": "AudioVideo"
+      "category": "AudioVideo",
+      "icon": "assets/icons/logo.png"
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "assets/icons/logo.png"
     }
   }
 }
