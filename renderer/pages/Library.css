@@ -228,6 +228,7 @@
 }
 
 .track-artwork {
+  position: relative;
   width: 100%;
   aspect-ratio: 1;
   border-radius: var(--radius-md);
@@ -301,6 +302,21 @@
 
 .track-card:hover .track-actions {
   opacity: 1;
+}
+
+.album-manual-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: rgba(0, 255, 136, 0.85);
+  color: #041407;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  box-shadow: 0 6px 20px rgba(0, 255, 136, 0.22);
 }
 
 .action-btn {
@@ -379,6 +395,19 @@
   align-items: center;
   gap: var(--spacing-sm);
   min-width: 0;
+}
+
+.album-manual-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(0, 255, 136, 0.15);
+  color: rgba(0, 255, 136, 0.85);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid rgba(0, 255, 136, 0.35);
 }
 
 .list-column .track-title {

@@ -212,9 +212,29 @@ async function fetchTracksWithArtwork({ query } = {}) {
     }
 
     const artworkIndex = buildArtworkIndex(albumSummaries);
-    const tracks = tracksResponse.data.map((track) =>
-      transformTrack(track, artworkIndex)
-    );
+    const albumDetailMap = new Map();
+
+    albumSummaries.forEach((album) => {
+      if (album && album.id) {
+        albumDetailMap.set(album.id, {
+          isManual: Boolean(album.is_manual),
+          metadata: album.metadata || null,
+        });
+      }
+    });
+
+    const tracks = tracksResponse.data.map((track) => {
+      const transformed = transformTrack(track, artworkIndex);
+      if (transformed.albumId && albumDetailMap.has(transformed.albumId)) {
+        const details = albumDetailMap.get(transformed.albumId);
+        transformed.albumIsManual = details.isManual;
+        transformed.albumMetadata = details.metadata;
+      } else {
+        transformed.albumIsManual = false;
+        transformed.albumMetadata = null;
+      }
+      return transformed;
+    });
 
     return { success: true, tracks };
   } catch (error) {
@@ -224,6 +244,56 @@ async function fetchTracksWithArtwork({ query } = {}) {
       error: error.message,
       tracks: [],
     };
+  }
+}
+
+async function fetchAlbumOverrideRecord(albumId) {
+  if (!albumId) {
+    return { success: false, error: 'Album identifier is required' };
+  }
+
+  try {
+    const response = await apiRequest(
+      `/library/albums/${encodeURIComponent(albumId)}/manual`
+    );
+
+    if (response && typeof response.success === 'boolean') {
+      return response;
+    }
+
+    return { success: false, error: 'Unexpected response from backend' };
+  } catch (error) {
+    if (typeof error.message === 'string' && error.message.startsWith('HTTP 404')) {
+      return { success: true, data: null };
+    }
+
+    console.error('Main process: Failed to load album override:', error);
+    return { success: false, error: error.message || 'Unknown error' };
+  }
+}
+
+async function setAlbumOverrideRecord(albumId, payload) {
+  if (!albumId) {
+    return { success: false, error: 'Album identifier is required' };
+  }
+
+  try {
+    const response = await apiRequest(
+      `/library/albums/${encodeURIComponent(albumId)}/manual`,
+      {
+        method: 'PUT',
+        body: payload,
+      }
+    );
+
+    if (response && typeof response.success === 'boolean') {
+      return response;
+    }
+
+    return { success: false, error: 'Unexpected response from backend' };
+  } catch (error) {
+    console.error('Main process: Failed to persist album override:', error);
+    return { success: false, error: error.message || 'Failed to save album override' };
   }
 }
 
@@ -263,7 +333,7 @@ function createWindow() {
       backgroundThrottling: false,
       webgl: true
     },
-    icon: path.join(__dirname, 'assets/icons/icon.png'),
+    icon: path.join(__dirname, 'assets/icons/logo.png'),
     titleBarStyle: 'hiddenInset',
     titleBarOverlay: {
       color: '#0a0a0a',
@@ -835,6 +905,15 @@ ipcMain.handle('search-library', async (event, query) => {
       tracks: []
     };
   }
+});
+
+ipcMain.handle('get-album-override', async (_event, albumId) => {
+  return fetchAlbumOverrideRecord(albumId);
+});
+
+ipcMain.handle('set-album-override', async (_event, albumId, payload) => {
+  const result = await setAlbumOverrideRecord(albumId, payload);
+  return result;
 });
 
 ipcMain.handle('delete-playlist', async (event, id) => {

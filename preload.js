@@ -24,6 +24,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   scanLibrary: (directories) => ipcRenderer.invoke('scan-library', directories),
   getLibrary: () => ipcRenderer.invoke('get-library'),
   searchLibrary: (query) => ipcRenderer.invoke('search-library', query),
+  getAlbumOverride: (albumId) => ipcRenderer.invoke('get-album-override', albumId),
+  setAlbumOverride: (albumId, payload) =>
+    ipcRenderer.invoke('set-album-override', albumId, payload),
   
   // Playlist management
   getPlaylists: () => ipcRenderer.invoke('get-playlists'),

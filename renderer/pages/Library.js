@@ -1,13 +1,39 @@
 import React, { useMemo, useState } from 'react';
-import { Search, Filter, Grid3X3, List, Play, Plus, Heart } from 'lucide-react';
+import { Search, Filter, Grid3X3, List, Play, Plus, Heart, Pencil } from 'lucide-react';
 import { useAudio } from '../contexts/AudioContext';
+import AlbumEditorModal from '../components/AlbumEditorModal';
 import './Library.css';
+
+const createEmptyAlbumEditorState = () => ({
+  isOpen: false,
+  albumId: null,
+  albumName: '',
+  albumArtist: '',
+  values: {
+    title: '',
+    primaryArtist: '',
+    searchAlbum: '',
+    searchArtist: '',
+  },
+  defaults: {
+    title: '',
+    primaryArtist: '',
+    searchAlbum: '',
+    searchArtist: '',
+  },
+  loading: false,
+  saving: false,
+  error: null,
+  metadata: null,
+  refreshingArtwork: false,
+});
 
 const Library = () => {
   const [viewMode, setViewMode] = useState('grid');
   const [sortBy, setSortBy] = useState('title');
   const [filterGenre, setFilterGenre] = useState('all');
   const [selectedTracks, setSelectedTracks] = useState(() => new Set());
+  const [albumEditorState, setAlbumEditorState] = useState(() => createEmptyAlbumEditorState());
 
   const {
     library,
@@ -17,7 +43,197 @@ const Library = () => {
     createPlaylist,
     librarySearchQuery,
     setLibrarySearchQuery,
+    refreshLibrary,
+    addNotification,
+    getAlbumOverride,
+    setAlbumOverride,
   } = useAudio();
+
+  const closeAlbumEditor = () => {
+    setAlbumEditorState(createEmptyAlbumEditorState());
+  };
+
+  const handleAlbumEditorFieldChange = (field, value) => {
+    setAlbumEditorState((previous) => ({
+      ...previous,
+      values: {
+        ...previous.values,
+        [field]: value,
+      },
+      error: null,
+    }));
+  };
+
+  const handleAlbumEditorReset = () => {
+    setAlbumEditorState((previous) => ({
+      ...previous,
+      values: { ...previous.defaults },
+      error: null,
+    }));
+  };
+
+  const openAlbumEditorForTrack = async (track) => {
+    if (!track?.albumId) {
+      addNotification(
+        'error',
+        'Unable to edit album',
+        'This track does not include a stable album identifier.'
+      );
+      return;
+    }
+
+    const fallbackTitle = track.album || '';
+    const fallbackArtist = track.artist || '';
+
+    setAlbumEditorState({
+      isOpen: true,
+      albumId: track.albumId,
+      albumName: fallbackTitle || 'Unknown album',
+      albumArtist: fallbackArtist,
+      values: {
+        title: fallbackTitle,
+        primaryArtist: fallbackArtist,
+        searchAlbum: fallbackTitle,
+        searchArtist: fallbackArtist,
+      },
+      defaults: {
+        title: fallbackTitle,
+        primaryArtist: fallbackArtist,
+        searchAlbum: fallbackTitle,
+        searchArtist: fallbackArtist,
+      },
+      loading: true,
+      saving: false,
+      error: null,
+      metadata: track.albumMetadata || null,
+      refreshingArtwork: false,
+    });
+
+    try {
+      const override = await getAlbumOverride(track.albumId);
+      if (override) {
+        setAlbumEditorState((previous) => ({
+          ...previous,
+          loading: false,
+          metadata: override.metadata ?? previous.metadata,
+          values: {
+            title: override.title ?? previous.values.title,
+            primaryArtist: override.primary_artist ?? previous.values.primaryArtist,
+            searchAlbum: override.search_album ?? previous.values.searchAlbum,
+            searchArtist: override.search_artist ?? previous.values.searchArtist,
+          },
+        }));
+      } else {
+        setAlbumEditorState((previous) => ({ ...previous, loading: false }));
+      }
+    } catch (error) {
+      console.error('Failed to fetch album override:', error);
+      setAlbumEditorState((previous) => ({
+        ...previous,
+        loading: false,
+        error: error.message || 'Unable to load manual metadata for this album.',
+      }));
+    }
+  };
+
+  const handleAlbumEditorSubmit = async () => {
+    if (!albumEditorState.albumId) {
+      return;
+    }
+
+    const payload = {
+      title: albumEditorState.values.title,
+      primary_artist: albumEditorState.values.primaryArtist,
+      search_album: albumEditorState.values.searchAlbum,
+      search_artist: albumEditorState.values.searchArtist,
+      refresh_artwork: false,
+    };
+
+    setAlbumEditorState((previous) => ({ ...previous, saving: true, error: null }));
+
+    try {
+      await setAlbumOverride(albumEditorState.albumId, payload);
+      addNotification(
+        'success',
+        'Album metadata updated',
+        'Manual album details saved successfully.'
+      );
+
+      try {
+        await refreshLibrary();
+      } catch (refreshError) {
+        console.warn('Library refresh after manual update failed:', refreshError);
+      }
+
+      setAlbumEditorState(createEmptyAlbumEditorState());
+    } catch (error) {
+      console.error('Failed to save album override:', error);
+      addNotification(
+        'error',
+        'Album update failed',
+        error.message || 'Please check your connection to the backend.'
+      );
+      setAlbumEditorState((previous) => ({
+        ...previous,
+        saving: false,
+        error: error.message || 'Failed to save album metadata.',
+      }));
+    }
+  };
+
+  const handleAlbumArtworkRefresh = async () => {
+    if (!albumEditorState.albumId) {
+      return;
+    }
+
+    const payload = {
+      title: albumEditorState.values.title,
+      primary_artist: albumEditorState.values.primaryArtist,
+      search_album: albumEditorState.values.searchAlbum,
+      search_artist: albumEditorState.values.searchArtist,
+      refresh_artwork: true,
+    };
+
+    setAlbumEditorState((previous) => ({
+      ...previous,
+      refreshingArtwork: true,
+      error: null,
+    }));
+
+    try {
+      const record = await setAlbumOverride(albumEditorState.albumId, payload);
+
+      addNotification(
+        'success',
+        'Artwork refresh requested',
+        'Album artwork will update once the new image is cached.'
+      );
+
+      setAlbumEditorState((previous) => ({
+        ...previous,
+        refreshingArtwork: false,
+        metadata: record?.metadata ?? previous.metadata,
+      }));
+
+      try {
+        await refreshLibrary();
+      } catch (refreshError) {
+        console.warn('Library refresh after artwork refresh failed:', refreshError);
+      }
+    } catch (error) {
+      console.error('Failed to refresh album artwork:', error);
+      addNotification(
+        'error',
+        'Artwork refresh failed',
+        error.message || 'Hexendrum could not refresh the artwork for this album.'
+      );
+      setAlbumEditorState((previous) => ({
+        ...previous,
+        refreshingArtwork: false,
+        error: error.message || 'Artwork refresh failed.',
+      }));
+    }
+  };
 
   const stats = useMemo(() => {
     const artists = new Set();
@@ -121,14 +337,24 @@ const Library = () => {
   };
 
   const renderArtwork = (track) => {
-    if (track.artwork) {
-      return <img src={track.artwork} alt={`${track.title} artwork`} loading="lazy" />;
-    }
-    return (
+    const content = track.artwork ? (
+      <img src={track.artwork} alt={`${track.title} artwork`} loading="lazy" />
+    ) : (
       <div className="artwork-placeholder">
         <span role="img" aria-hidden="true">
           ♪
         </span>
+      </div>
+    );
+
+    return (
+      <div className="track-artwork">
+        {content}
+        {track.albumIsManual && (
+          <span className="album-manual-badge" title="Manual album metadata applied">
+            Manual
+          </span>
+        )}
       </div>
     );
   };
@@ -166,7 +392,7 @@ const Library = () => {
               </button>
             </div>
 
-            <div className="track-artwork">{renderArtwork(track)}</div>
+            {renderArtwork(track)}
 
             <div className="track-info">
               <div className="track-title" title={track.title}>
@@ -201,6 +427,16 @@ const Library = () => {
                 }}
               >
                 <Plus size={14} />
+              </button>
+              <button
+                className="action-btn"
+                title="Edit album metadata"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  openAlbumEditorForTrack(track);
+                }}
+              >
+                <Pencil size={14} />
               </button>
               <button
                 className="action-btn"
@@ -249,7 +485,12 @@ const Library = () => {
               {track.artist}
             </div>
             <div className="list-column track-album" title={track.album}>
-              {track.album}
+              <span>{track.album}</span>
+              {track.albumIsManual && (
+                <span className="album-manual-chip" title="Manual album metadata applied">
+                  Manual
+                </span>
+              )}
             </div>
             <div className="list-column track-genre">{track.genre || 'Unknown'}</div>
             <div className="list-column track-duration">
@@ -275,6 +516,16 @@ const Library = () => {
                 }}
               >
                 <Plus size={14} />
+              </button>
+              <button
+                className="action-btn"
+                title="Edit album metadata"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  openAlbumEditorForTrack(track);
+                }}
+              >
+                <Pencil size={14} />
               </button>
             </div>
           </div>
@@ -395,6 +646,24 @@ const Library = () => {
           renderList()
         )}
       </div>
+
+      <AlbumEditorModal
+        isOpen={albumEditorState.isOpen}
+        albumName={albumEditorState.albumName}
+        albumArtist={albumEditorState.albumArtist}
+        values={albumEditorState.values}
+        defaults={albumEditorState.defaults}
+        loading={albumEditorState.loading}
+        saving={albumEditorState.saving}
+        refreshingArtwork={albumEditorState.refreshingArtwork}
+        error={albumEditorState.error}
+        metadata={albumEditorState.metadata}
+        onChange={handleAlbumEditorFieldChange}
+        onSubmit={handleAlbumEditorSubmit}
+        onClose={closeAlbumEditor}
+        onReset={handleAlbumEditorReset}
+        onRefreshArtwork={handleAlbumArtworkRefresh}
+      />
     </div>
   );
 };

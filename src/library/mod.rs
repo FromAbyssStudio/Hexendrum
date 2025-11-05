@@ -14,7 +14,10 @@ use crate::audio::is_supported_audio_format;
 use crate::utils::ensure_directory;
 
 mod albums;
-pub use albums::{album_identifier, AlbumService, AlbumSummary};
+pub use albums::{
+    album_identifier, AlbumExportFormat, AlbumMetadata, AlbumOverrideRecord, AlbumService,
+    AlbumSummary, ManualAlbumUpdate,
+};
 
 fn merge_metadata_from_tag(
     tag: &dyn Accessor,

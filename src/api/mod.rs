@@ -21,8 +21,12 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use crate::audio::AudioPlayer;
 use crate::events::{EventBus, EventMessage, EventPayload};
-use crate::library::{album_identifier, AlbumService, AlbumSummary, Library, Track};
+use crate::library::{
+    album_identifier, AlbumExportFormat, AlbumMetadata, AlbumOverrideRecord, AlbumService,
+    AlbumSummary, Library, ManualAlbumUpdate, Track,
+};
 use crate::playlist::PlaylistManager;
+use chrono::{DateTime, Utc};
 
 /// API state shared across all handlers
 #[derive(Clone)]
@@ -109,6 +113,10 @@ pub struct AlbumResponse {
     /// Artwork endpoint URL if cached
     #[schema(example = "/api/library/albums/1f3870be274f6c49b3e31a0c6728957f/artwork")]
     pub artwork_url: Option<String>,
+    /// Stored metadata resolved for this album (if available)
+    pub metadata: Option<AlbumMetadata>,
+    /// Indicates whether this album data was manually overridden
+    pub is_manual: bool,
 }
 
 /// API response wrapper
@@ -165,6 +173,78 @@ pub struct AlbumSearchQuery {
     pub q: Option<String>,
 }
 
+/// Manual album metadata update payload
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct ManualAlbumUpdateRequest {
+    /// Custom display title for this album
+    #[schema(example = "DOOM Original Game Soundtrack")]
+    pub title: Option<String>,
+    /// Preferred display artist for this album
+    #[schema(example = "Mick Gordon")]
+    pub primary_artist: Option<String>,
+    /// Album name to use when searching remote metadata providers
+    #[schema(example = "DOOM (2016)")]
+    pub search_album: Option<String>,
+    /// Artist name to use when searching remote metadata providers
+    #[schema(example = "Mick Gordon")]
+    pub search_artist: Option<String>,
+    /// Force Hexendrum to refresh cached artwork and metadata from remote providers
+    #[serde(default)]
+    pub refresh_artwork: bool,
+}
+
+/// Manual override record response
+#[derive(Debug, Serialize, ToSchema)]
+pub struct AlbumOverrideResponse {
+    /// Album identifier this manual override applies to
+    pub album_id: String,
+    /// Custom display title
+    pub title: Option<String>,
+    /// Custom display primary artist
+    pub primary_artist: Option<String>,
+    /// Album title used for remote lookups
+    pub search_album: Option<String>,
+    /// Artist name used for remote lookups
+    pub search_artist: Option<String>,
+    /// Cached metadata stored alongside the override
+    pub metadata: Option<AlbumMetadata>,
+    /// Cached artwork path on the local filesystem
+    pub artwork_path: Option<String>,
+    /// Artwork URL served by the backend (if cached)
+    pub artwork_url: Option<String>,
+    /// Last time this override was updated
+    pub updated_at: DateTime<Utc>,
+}
+
+impl From<AlbumOverrideRecord> for AlbumOverrideResponse {
+    fn from(record: AlbumOverrideRecord) -> Self {
+        let artwork_url = record
+            .artwork_path
+            .as_ref()
+            .map(|_| format!("/api/library/albums/{}/artwork", record.album_id));
+
+        Self {
+            album_id: record.album_id,
+            title: record.title,
+            primary_artist: record.primary_artist,
+            search_album: record.search_album,
+            search_artist: record.search_artist,
+            metadata: record.metadata,
+            artwork_path: record.artwork_path,
+            artwork_url,
+            updated_at: record.updated_at,
+        }
+    }
+}
+
+/// Query parameters used when exporting manual album overrides
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct AlbumExportQuery {
+    /// Desired export format (`json` or `yaml`)
+    #[schema(example = "yaml")]
+    pub format: Option<String>,
+}
+
 /// OpenAPI documentation structure
 #[derive(OpenApi)]
 #[openapi(
@@ -179,6 +259,10 @@ pub struct AlbumSearchQuery {
         ScanRequest,
         SearchQuery,
         AlbumSearchQuery,
+        ManualAlbumUpdateRequest,
+        AlbumOverrideResponse,
+        AlbumExportQuery,
+        AlbumMetadata,
         LibraryStats,
         PlaylistResponse,
         PlayRequest,
@@ -243,6 +327,14 @@ pub fn create_router(state: AppState) -> Router {
         .route("/api/library/search", get(search_tracks))
         .route("/api/library/albums/search", get(search_albums))
         .route("/api/library/albums/:id/artwork", get(get_album_artwork))
+        .route(
+            "/api/library/albums/:id/manual",
+            get(get_album_manual_override).put(set_album_manual_override),
+        )
+        .route(
+            "/api/library/albums/manual/export",
+            get(export_album_overrides),
+        )
         .route("/api/events/ws", get(events_ws_handler))
         .route("/api/library/stats", get(get_library_stats))
         .route("/api/playlists", get(get_playlists))
@@ -357,6 +449,8 @@ async fn search_albums(
                 artists,
                 track_count,
                 artwork_path,
+                metadata,
+                is_manual,
             } = album;
 
             let artwork_url = artwork_path.map(|_| format!("/api/library/albums/{}/artwork", id));
@@ -368,6 +462,8 @@ async fn search_albums(
                 artists,
                 track_count,
                 artwork_url,
+                metadata,
+                is_manual,
             }
         })
         .collect();
@@ -481,6 +577,83 @@ async fn get_album_artwork(
     } else {
         Err(StatusCode::NOT_FOUND)
     }
+}
+
+/// Retrieve the manual override (if any) for an album
+async fn get_album_manual_override(
+    State(state): State<AppState>,
+    Path(album_id): Path<String>,
+) -> Result<Json<ApiResponse<AlbumOverrideResponse>>, StatusCode> {
+    match state.album_service.get_override(&album_id) {
+        Some(record) => Ok(Json(ApiResponse::success(record.into()))),
+        None => Err(StatusCode::NOT_FOUND),
+    }
+}
+
+/// Create or update the manual override for an album and refresh metadata/artwork
+async fn set_album_manual_override(
+    State(state): State<AppState>,
+    Path(album_id): Path<String>,
+    Json(payload): Json<ManualAlbumUpdateRequest>,
+) -> Result<Json<ApiResponse<AlbumOverrideResponse>>, StatusCode> {
+    let update = ManualAlbumUpdate {
+        title: payload.title,
+        primary_artist: payload.primary_artist,
+        search_album: payload.search_album,
+        search_artist: payload.search_artist,
+        refresh_artwork: payload.refresh_artwork,
+    };
+
+    match state
+        .album_service
+        .set_manual_override(&album_id, update)
+        .await
+    {
+        Ok(record) => Ok(Json(ApiResponse::success(record.into()))),
+        Err(error) => {
+            error!(
+                "Failed to set manual override for album {}: {}",
+                album_id, error
+            );
+            Err(StatusCode::BAD_REQUEST)
+        }
+    }
+}
+
+/// Export all manual album overrides in JSON or YAML formats
+async fn export_album_overrides(
+    State(state): State<AppState>,
+    Query(query): Query<AlbumExportQuery>,
+) -> Result<Response, StatusCode> {
+    let format_string = query
+        .format
+        .as_deref()
+        .unwrap_or("json")
+        .trim()
+        .to_lowercase();
+
+    let (format, content_type) = match format_string.as_str() {
+        "yaml" | "yml" => (AlbumExportFormat::Yaml, "application/x-yaml"),
+        "json" => (AlbumExportFormat::Json, "application/json"),
+        other => {
+            error!("Unsupported export format requested: {}", other);
+            return Err(StatusCode::BAD_REQUEST);
+        }
+    };
+
+    let payload = state
+        .album_service
+        .export_overrides(format)
+        .map_err(|error| {
+            error!("Failed to export album overrides: {}", error);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, content_type)
+        .body(Body::from(payload))
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }
 
 /// Get library statistics

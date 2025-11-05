@@ -10,6 +10,7 @@ fn api_response_structs_support_field_access() {
         title: Some("Song".into()),
         artist: Some("Artist".into()),
         album: Some("Album".into()),
+        album_id: Some("album-id".into()),
         genre: Some("Genre".into()),
         duration: Some(123),
         file_size: 42,

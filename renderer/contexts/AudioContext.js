@@ -522,6 +522,49 @@ export function AudioProvider({ children }) {
     [setVolume, state.volume]
   );
 
+  const getAlbumOverride = useCallback(async (albumId) => {
+    if (!albumId || !window?.electronAPI?.getAlbumOverride) {
+      return null;
+    }
+
+    try {
+      const response = await window.electronAPI.getAlbumOverride(albumId);
+      if (!response) {
+        return null;
+      }
+
+      if (response.success) {
+        return response.data ?? null;
+      }
+
+      throw new Error(response.error || 'Failed to load album override');
+    } catch (error) {
+      console.error('Failed to load album override:', error);
+      throw error;
+    }
+  }, []);
+
+  const setAlbumOverride = useCallback(async (albumId, payload) => {
+    if (!albumId) {
+      throw new Error('Album identifier is required');
+    }
+    if (!window?.electronAPI?.setAlbumOverride) {
+      throw new Error('Manual album editing is unavailable');
+    }
+
+    try {
+      const response = await window.electronAPI.setAlbumOverride(albumId, payload);
+      if (response?.success) {
+        return response.data ?? null;
+      }
+
+      throw new Error(response?.error || 'Failed to save album override');
+    } catch (error) {
+      console.error('Failed to save album override:', error);
+      throw error;
+    }
+  }, []);
+
   const playTrack = useCallback(
     async (track) => {
       if (!track || !track.path) {
@@ -893,6 +936,8 @@ export function AudioProvider({ children }) {
     togglePlaylistFavorite,
     loadLibrary,
     loadPlaylists,
+    getAlbumOverride,
+    setAlbumOverride,
   };
 
   return <AudioContext.Provider value={value}>{children}</AudioContext.Provider>;
